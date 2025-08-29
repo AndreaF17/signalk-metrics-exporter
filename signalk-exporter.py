@@ -2,15 +2,16 @@
 import requests
 import sys
 import argparse
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s: %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 
 
 
-def extract_global_labels(data):
-    labels = {}
-    for key in ("mmsi", "uuid", "name"):
-        if key in data and isinstance(data[key], str):
-            labels[key] = data[key]
-    return labels
 
 def flatten(prefix, data, metrics, base_labels):
     if isinstance(data, dict):
@@ -55,13 +56,24 @@ def flatten(prefix, data, metrics, base_labels):
         )
 
 def fetch_signalk(signalk_url):
-    resp = requests.get(signalk_url, timeout=5)
-    resp.raise_for_status()
-    return resp.json()
+    try:
+        resp = requests.get(signalk_url, timeout=5)
+        resp.raise_for_status()
+        return resp.json()
+    except requests.exceptions.HTTPError as http_err:
+        if resp.status_code == 404:
+            logging.warning("Sensors not turned on")
+            sys.exit(0)
+        else:
+            logging.error(f"HTTP error occurred: {http_err}")
+            raise
+    except requests.exceptions.RequestException as err:
+        logging.error(f"Request failed: {err}")
+        raise
 
 def convert_to_prometheus(data):
     metrics = []
-    base_labels = extract_global_labels(data)
+    base_labels = {}
     flatten("", data, metrics, base_labels)
     return "\n".join(metrics)
 
@@ -79,5 +91,5 @@ if __name__ == "__main__":
         prom_text = convert_to_prometheus(data)
         print(prom_text)
     except Exception as e:
-        sys.stderr.write(f"Error: {e}\n")
+        logging.error(f"Error: {e}")
         sys.exit(1)
