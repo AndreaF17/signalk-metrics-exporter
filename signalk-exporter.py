@@ -13,7 +13,7 @@ logging.basicConfig(
 
 
 
-def flatten(prefix, data, metrics, base_labels):
+def flatten(prefix, data, metrics, base_labels, add_comments=True):
     if isinstance(data, dict):
         if "value" in data and isinstance(data["value"], (int, float)):
             # Determine type and unit for metric name
@@ -51,17 +51,16 @@ def flatten(prefix, data, metrics, base_labels):
                 "{" + ",".join(f'{k}="{v}"' for k, v in labels.items()) + "}"
                 if labels else ""
             )
-            metrics.append(
-                f"# HELP {metric_name} SignalK metric {metric_name}\n"
-                f"# TYPE {metric_name} gauge\n"
-                f"{metric_name}{label_str} {value}"
-            )
+            if add_comments:
+                metrics.append(f"# HELP {metric_name} SignalK metric {metric_name}")
+                metrics.append(f"# TYPE {metric_name} gauge")
+            metrics.append(f"{metric_name}{label_str} {value}")
         else:
             for k, v in data.items():
                 if k in ("meta", "$source", "timestamp", "pgn"):
                     continue
                 new_prefix = f"{prefix}_{k}" if prefix else k
-                flatten(new_prefix, v, metrics, base_labels)
+                flatten(new_prefix, v, metrics, base_labels, add_comments)
     elif isinstance(data, (int, float)):
         type_part = prefix.split("_")[-1] if prefix else "value"
         metric_name = f"signalk_{type_part}"
@@ -71,11 +70,10 @@ def flatten(prefix, data, metrics, base_labels):
             "{" + ",".join(f'{k}="{v}"' for k, v in labels.items()) + "}"
             if labels else ""
         )
-        metrics.append(
-            f"# HELP {metric_name} SignalK metric {metric_name}\n"
-            f"# TYPE {metric_name} gauge\n"
-            f"{metric_name}{label_str} {data}"
-        )
+        if add_comments:
+            metrics.append(f"# HELP {metric_name} SignalK metric {metric_name}")
+            metrics.append(f"# TYPE {metric_name} gauge")
+        metrics.append(f"{metric_name}{label_str} {data}")
 
 def fetch_signalk(signalk_url):
     try:
@@ -93,24 +91,29 @@ def fetch_signalk(signalk_url):
         logging.error(f"Request failed: {err}")
         raise
 
-def convert_to_prometheus(data):
+def convert_to_prometheus(data, add_comments=True):
     metrics = []
     base_labels = {}
-    flatten("", data, metrics, base_labels)
+    flatten("", data, metrics, base_labels, add_comments)
     return "\n".join(metrics)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Export SignalK vessel data as Prometheus metrics.")
     parser.add_argument(
-        "--signalk-url",
+        "-u", "--signalk-url",
         type=str,
         required=True,
         help="SignalK API URL to fetch vessel data eg: http://127.0.0.1:3000/signalk/v1/api/vessels/self",
     )
+    parser.add_argument(
+        "-n", "--no-comments",
+        action="store_true",
+        help="Do not include HELP/TYPE comments in the Prometheus output."
+    )
     args = parser.parse_args()
     try:
         data = fetch_signalk(args.signalk_url)
-        prom_text = convert_to_prometheus(data)
+        prom_text = convert_to_prometheus(data, add_comments=not args.no_comments)
         print(prom_text)
     except Exception as e:
         logging.error(f"Error: {e}")
