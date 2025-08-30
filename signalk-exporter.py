@@ -16,25 +16,45 @@ logging.basicConfig(
 def flatten(prefix, data, metrics, base_labels):
     if isinstance(data, dict):
         if "value" in data and isinstance(data["value"], (int, float)):
-            metric_name = prefix.replace(".", "_").replace("-", "_")
+            # Determine type and unit for metric name
+            unit = None
+            if "meta" in data and "units" in data["meta"]:
+                unit = data["meta"]["units"].replace("/", "_per_").replace(" ", "_")
+            # Try to infer type from prefix (last part)
+            type_part = prefix.split("_")[-1] if prefix else "value"
+            # Prometheus metric name: signalk_TYPE_UNIT
+            metric_name = f"signalk_{type_part}"
+            if unit:
+                metric_name += f"_{unit}"
+            metric_name = metric_name.lower()
 
             labels = base_labels.copy()
             if "$source" in data:
                 labels["source"] = data["$source"]
             if "pgn" in data:
                 labels["pgn"] = str(data["pgn"])
-            if "meta" in data and "units" in data["meta"]:
-                labels["units"] = data["meta"]["units"]
-
+            # Remove 'units' label if present
+            # Convert speed units to knots if needed
+            value = data["value"]
+            if unit:
+                speed_units = ["m_s", "m_per_s", "km_h", "km_per_h", "kn", "knots"]
+                if type_part.lower().startswith("speed") or "speed" in type_part.lower():
+                    if unit in ["m_s", "m_per_s"]:
+                        value = value * 1.94384  # m/s to knots
+                        metric_name = metric_name.replace("m_s", "knots").replace("m_per_s", "knots")
+                    elif unit in ["km_h", "km_per_h"]:
+                        value = value * 0.539957  # km/h to knots
+                        metric_name = metric_name.replace("km_h", "knots").replace("km_per_h", "knots")
+                    elif unit in ["kn", "knots"]:
+                        metric_name = metric_name.replace("kn", "knots")
             label_str = (
                 "{" + ",".join(f'{k}="{v}"' for k, v in labels.items()) + "}"
                 if labels else ""
             )
-
             metrics.append(
                 f"# HELP {metric_name} SignalK metric {metric_name}\n"
                 f"# TYPE {metric_name} gauge\n"
-                f"{metric_name}{label_str} {data['value']}"
+                f"{metric_name}{label_str} {value}"
             )
         else:
             for k, v in data.items():
@@ -43,7 +63,9 @@ def flatten(prefix, data, metrics, base_labels):
                 new_prefix = f"{prefix}_{k}" if prefix else k
                 flatten(new_prefix, v, metrics, base_labels)
     elif isinstance(data, (int, float)):
-        metric_name = prefix.replace(".", "_").replace("-", "_")
+        type_part = prefix.split("_")[-1] if prefix else "value"
+        metric_name = f"signalk_{type_part}"
+        metric_name = metric_name.lower()
         labels = base_labels.copy()
         label_str = (
             "{" + ",".join(f'{k}="{v}"' for k, v in labels.items()) + "}"
