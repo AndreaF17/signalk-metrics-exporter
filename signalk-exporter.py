@@ -231,10 +231,11 @@ def convert_to_prometheus(data, add_comments=True):
                 metrics.append(f"# TYPE {metric_name} gauge")
             metrics.append(f"{metric_name}{label_str} {bearing}")
 
-        # Velocity Made Good
+        # Velocity Made Good (convert from m/s to knots)
         if "velocityMadeGood" in next_point:
-            vmg = next_point["velocityMadeGood"]["value"]
-            metric_name = "signalk_navigation_nextpoint_velocity_made_good"
+            vmg_ms = next_point["velocityMadeGood"]["value"]
+            vmg_knots = vmg_ms * 1.94384  # Convert m/s to knots
+            metric_name = "signalk_navigation_nextpoint_velocity_made_good_knots"
             labels_vmg = {}
             if "$source" in next_point["velocityMadeGood"]:
                 labels_vmg["source"] = next_point["velocityMadeGood"]["$source"]
@@ -246,9 +247,9 @@ def convert_to_prometheus(data, add_comments=True):
                 if labels_vmg else ""
             )
             if add_comments:
-                metrics.append(f"# HELP {metric_name} Velocity Made Good towards next waypoint")
+                metrics.append(f"# HELP {metric_name} Velocity Made Good towards next waypoint in knots")
                 metrics.append(f"# TYPE {metric_name} gauge")
-            metrics.append(f"{metric_name}{label_str} {vmg}")
+            metrics.append(f"{metric_name}{label_str} {vmg_knots:.2f}")
 
         # Time to Go
         if "timeToGo" in next_point:
