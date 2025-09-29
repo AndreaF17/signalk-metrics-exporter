@@ -166,6 +166,143 @@ def convert_to_prometheus(data, add_comments=True):
         metrics.append(f"{metric_name} {autopilot_val}")
     except Exception:
         pass
+
+    # Add water temperature metric (convert from Kelvin to Celsius)
+    try:
+        water_temp_k = data["environment"]["water"]["temperature"]["value"]
+        water_temp_c = water_temp_k - 273.15
+        metric_name = "signalk_environment_water_temperature_celsius"
+        labels = {}
+        if "$source" in data["environment"]["water"]["temperature"]:
+            labels["source"] = data["environment"]["water"]["temperature"]["$source"]
+        if "pgn" in data["environment"]["water"]["temperature"]:
+            labels["pgn"] = str(data["environment"]["water"]["temperature"]["pgn"])
+        
+        label_str = (
+            "{" + ",".join(f'{k}="{v}"' for k, v in labels.items()) + "}"
+            if labels else ""
+        )
+        if add_comments:
+            metrics.append(f"# HELP {metric_name} Water temperature in Celsius")
+            metrics.append(f"# TYPE {metric_name} gauge")
+        metrics.append(f"{metric_name}{label_str} {water_temp_c:.2f}")
+    except Exception:
+        pass
+
+    # Add navigation nextPoint metrics
+    try:
+        next_point = data["navigation"]["courseGreatCircle"]["nextPoint"]
+        labels = {}
+        
+        # Distance to next waypoint
+        if "distance" in next_point:
+            distance = next_point["distance"]["value"]
+            metric_name = "signalk_navigation_nextpoint_distance_meters"
+            if "$source" in next_point["distance"]:
+                labels["source"] = next_point["distance"]["$source"]
+            if "pgn" in next_point["distance"]:
+                labels["pgn"] = str(next_point["distance"]["pgn"])
+            
+            label_str = (
+                "{" + ",".join(f'{k}="{v}"' for k, v in labels.items()) + "}"
+                if labels else ""
+            )
+            if add_comments:
+                metrics.append(f"# HELP {metric_name} Distance to next waypoint in meters")
+                metrics.append(f"# TYPE {metric_name} gauge")
+            metrics.append(f"{metric_name}{label_str} {distance}")
+
+        # Bearing to next waypoint
+        if "bearingTrue" in next_point:
+            bearing = next_point["bearingTrue"]["value"]
+            metric_name = "signalk_navigation_nextpoint_bearing_true_radians"
+            labels_bearing = {}
+            if "$source" in next_point["bearingTrue"]:
+                labels_bearing["source"] = next_point["bearingTrue"]["$source"]
+            if "pgn" in next_point["bearingTrue"]:
+                labels_bearing["pgn"] = str(next_point["bearingTrue"]["pgn"])
+            
+            label_str = (
+                "{" + ",".join(f'{k}="{v}"' for k, v in labels_bearing.items()) + "}"
+                if labels_bearing else ""
+            )
+            if add_comments:
+                metrics.append(f"# HELP {metric_name} True bearing to next waypoint in radians")
+                metrics.append(f"# TYPE {metric_name} gauge")
+            metrics.append(f"{metric_name}{label_str} {bearing}")
+
+        # Velocity Made Good
+        if "velocityMadeGood" in next_point:
+            vmg = next_point["velocityMadeGood"]["value"]
+            metric_name = "signalk_navigation_nextpoint_velocity_made_good"
+            labels_vmg = {}
+            if "$source" in next_point["velocityMadeGood"]:
+                labels_vmg["source"] = next_point["velocityMadeGood"]["$source"]
+            if "pgn" in next_point["velocityMadeGood"]:
+                labels_vmg["pgn"] = str(next_point["velocityMadeGood"]["pgn"])
+            
+            label_str = (
+                "{" + ",".join(f'{k}="{v}"' for k, v in labels_vmg.items()) + "}"
+                if labels_vmg else ""
+            )
+            if add_comments:
+                metrics.append(f"# HELP {metric_name} Velocity Made Good towards next waypoint")
+                metrics.append(f"# TYPE {metric_name} gauge")
+            metrics.append(f"{metric_name}{label_str} {vmg}")
+
+        # Time to Go
+        if "timeToGo" in next_point:
+            ttg = next_point["timeToGo"]["value"]
+            metric_name = "signalk_navigation_nextpoint_time_to_go_seconds"
+            labels_ttg = {}
+            if "$source" in next_point["timeToGo"]:
+                labels_ttg["source"] = next_point["timeToGo"]["$source"]
+            if "pgn" in next_point["timeToGo"]:
+                labels_ttg["pgn"] = str(next_point["timeToGo"]["pgn"])
+            
+            label_str = (
+                "{" + ",".join(f'{k}="{v}"' for k, v in labels_ttg.items()) + "}"
+                if labels_ttg else ""
+            )
+            if add_comments:
+                metrics.append(f"# HELP {metric_name} Time to reach next waypoint in seconds")
+                metrics.append(f"# TYPE {metric_name} gauge")
+            metrics.append(f"{metric_name}{label_str} {ttg}")
+
+        # Next waypoint position
+        if "position" in next_point and "value" in next_point["position"]:
+            position = next_point["position"]["value"]
+            labels_pos = {}
+            if "$source" in next_point["position"]:
+                labels_pos["source"] = next_point["position"]["$source"]
+            if "pgn" in next_point["position"]:
+                labels_pos["pgn"] = str(next_point["position"]["pgn"])
+            
+            if "longitude" in position and position["longitude"] is not None:
+                metric_name = "signalk_navigation_nextpoint_longitude_degrees"
+                label_str = (
+                    "{" + ",".join(f'{k}="{v}"' for k, v in labels_pos.items()) + "}"
+                    if labels_pos else ""
+                )
+                if add_comments:
+                    metrics.append(f"# HELP {metric_name} Longitude of next waypoint in degrees")
+                    metrics.append(f"# TYPE {metric_name} gauge")
+                metrics.append(f"{metric_name}{label_str} {position['longitude']}")
+            
+            if "latitude" in position and position["latitude"] is not None:
+                metric_name = "signalk_navigation_nextpoint_latitude_degrees"
+                label_str = (
+                    "{" + ",".join(f'{k}="{v}"' for k, v in labels_pos.items()) + "}"
+                    if labels_pos else ""
+                )
+                if add_comments:
+                    metrics.append(f"# HELP {metric_name} Latitude of next waypoint in degrees")
+                    metrics.append(f"# TYPE {metric_name} gauge")
+                metrics.append(f"{metric_name}{label_str} {position['latitude']}")
+
+    except Exception:
+        pass
+
     return "\n".join(metrics)
 
 if __name__ == "__main__":
