@@ -3,6 +3,7 @@ import requests
 import sys
 import argparse
 import logging
+import math
 
 logging.basicConfig(
     level=logging.INFO,
@@ -164,6 +165,49 @@ def convert_to_prometheus(data, add_comments=True):
             metrics.append(f"# HELP {metric_name} Autopilot state: 0=standby, 1=active")
             metrics.append(f"# TYPE {metric_name} gauge")
         metrics.append(f"{metric_name} {autopilot_val}")
+    except Exception:
+        pass
+
+    # Add autopilot target heading magnetic (convert from radians to degrees)
+    try:
+        heading_mag_rad = data["steering"]["autopilot"]["target"]["headingMagnetic"]["value"]
+        heading_mag_deg = heading_mag_rad * (180 / math.pi)
+        metric_name = "signalk_steering_autopilot_target_heading_magnetic_degrees"
+        labels = {}
+        if "$source" in data["steering"]["autopilot"]["target"]["headingMagnetic"]:
+            labels["source"] = data["steering"]["autopilot"]["target"]["headingMagnetic"]["$source"]
+        if "pgn" in data["steering"]["autopilot"]["target"]["headingMagnetic"]:
+            labels["pgn"] = str(data["steering"]["autopilot"]["target"]["headingMagnetic"]["pgn"])
+        
+        label_str = (
+            "{" + ",".join(f'{k}="{v}"' for k, v in labels.items()) + "}"
+            if labels else ""
+        )
+        if add_comments:
+            metrics.append(f"# HELP {metric_name} Autopilot target heading magnetic in degrees")
+            metrics.append(f"# TYPE {metric_name} gauge")
+        metrics.append(f"{metric_name}{label_str} {heading_mag_deg:.2f}")
+    except Exception:
+        pass
+
+    # Add navigation log metric (total distance traveled)
+    try:
+        nav_log = data["navigation"]["log"]["value"]
+        metric_name = "signalk_navigation_log_meters"
+        labels = {}
+        if "$source" in data["navigation"]["log"]:
+            labels["source"] = data["navigation"]["log"]["$source"]
+        if "pgn" in data["navigation"]["log"]:
+            labels["pgn"] = str(data["navigation"]["log"]["pgn"])
+        
+        label_str = (
+            "{" + ",".join(f'{k}="{v}"' for k, v in labels.items()) + "}"
+            if labels else ""
+        )
+        if add_comments:
+            metrics.append(f"# HELP {metric_name} Total distance traveled in meters")
+            metrics.append(f"# TYPE {metric_name} gauge")
+        metrics.append(f"{metric_name}{label_str} {nav_log}")
     except Exception:
         pass
 
