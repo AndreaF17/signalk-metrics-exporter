@@ -1,0 +1,2 @@
+requests>=2.28.2
+# Add other Python dependencies here if you extend the project
