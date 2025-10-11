@@ -99,10 +99,6 @@ A simple approach for testing is to run the script periodically with cron and ha
 - The script intentionally avoids creating a long-running server; it's a simple conversion tool. If you want a production exporter, consider adding a small HTTP server (Flask, FastAPI) with caching and a scrape-ready `/metrics` endpoint.
 - The code is kept minimal and only depends on `requests`.
 
-## License
-
-This repository does not include a license file. If you want to publish it on GitHub, add a `LICENSE` file with your preferred license (MIT, Apache-2.0, etc.).
-
 ## Contact
 
 If you have improvements, file an issue or a PR with suggested changes.
